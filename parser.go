@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -25,6 +26,8 @@ type Parser struct {
 	lc     int
 	mem    Memory
 	apass  bool // Another Pass?
+	pdepth int  // Parsed depth
+	mdepth int  // Max depth
 }
 
 func NewParser(l *Lexer, st *SymbolTable) *Parser {
@@ -32,11 +35,16 @@ func NewParser(l *Lexer, st *SymbolTable) *Parser {
 	return &Parser{
 		lex:    l,
 		symtab: st,
+		lc:     0o200,
 		mem:    make(Memory),
+		mdepth: 10,
 	}
 }
 
 func (p *Parser) parseP8Assembly() {
+	p.pdepth++
+	fmt.Printf("Making pass #%d\n", p.pdepth)
+
 	// Create our parser
 	// p := Parser{
 	// 	lex:    l,
@@ -52,17 +60,20 @@ loop:
 		p.lex.Advance()
 		// fmt.Printf("%d, %d\t[%d]\t%s\n", l.This.Line, l.This.Col, l.This.Type, strings.TrimSpace(string(l.This.Bytes)))
 
-		if p.lex.This.Type == PUNCTUATION && p.lex.This.Bytes[0] == '*' {
-			// Asterisk means Next sets the location counter
-			p.lex.Advance()
-			p.lc = p.parseNumber()
-			// fmt.Printf("Setting location counter: %o\n", p.lc)
-			p.lex.Advance()
-		}
-
 		switch p.lex.This.Type {
+
 		case PUNCTUATION:
 			switch p.lex.This.Bytes[0] {
+
+			case '*': // Asterisk means Next sets the location counter
+				p.lex.Advance()
+				var str string
+				p.lc, str = p.parseExpression()
+				if str != "" {
+					panic("Unknown symbol: " + str)
+				}
+				// fmt.Printf("Setting location counter: %o\n", p.lc)
+
 			case '.':
 				fallthrough
 			case '-':
@@ -70,12 +81,14 @@ loop:
 			case '+':
 				inst, expr := p.parseExpression()
 				if expr != "" {
+					fmt.Println("Another pass required:", expr)
 					p.apass = true
 				} else {
 					p.mem[p.lc] = inst
 				}
 				p.lc++
 			}
+
 		case SYMBOL:
 			if p.lex.Next.Type == PUNCTUATION && p.lex.Next.Bytes[0] != '.' { // Symbol definition
 				switch p.lex.Next.Bytes[0] {
@@ -89,13 +102,14 @@ loop:
 				case '+':
 					inst, expr := p.parseExpression()
 					if expr != "" {
-						// fmt.Println("Another pass required:", expr)
+						fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
 						p.mem[p.lc] = inst
 					}
 					p.lc++
 				}
+
 			} else { // Were using the symbol
 				// Lookup symbol
 				sym := p.symtab.Get(string(p.lex.This.Bytes))
@@ -120,6 +134,7 @@ loop:
 					// Parse expression of address operand
 					result, expr := p.parseExpression()
 					if expr != "" {
+						fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
 						if indirect {
@@ -137,6 +152,7 @@ loop:
 				} else {
 					inst, expr := p.parseExpression()
 					if expr != "" {
+						fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
 						p.mem[p.lc] = inst
@@ -144,23 +160,29 @@ loop:
 				}
 				p.lc++
 			}
+
 		case NUMBER:
 			inst := p.parseNumber()
 			p.mem[p.lc] = inst
 			p.lc++
+
 		case EOF:
 			break loop
 		}
 	}
 
-	if p.apass {
-		// fmt.Println("Making another pass")
+	if p.apass && p.pdepth < p.mdepth {
+		p.pdepth++
+		fmt.Printf("Making pass #%d\n", p.pdepth)
 		// Reset lexer to beginning of file
 		p.lex.Reset()
 		// Reset parser state
 		p.lc = 0
 		p.apass = false
 		goto loop
+
+	} else if p.pdepth >= p.mdepth {
+		fmt.Println("Parsing failed")
 	}
 }
 
@@ -173,6 +195,7 @@ func (p *Parser) parseNumber() int {
 
 		if p.lex.This.Bytes[1] == 'd' {
 			// Parse decimal number
+			// fmt.Println(string(p.lex.This.Bytes[2:]))
 			i64, err = strconv.ParseInt(string(p.lex.This.Bytes[2:]), 10, 16)
 		} else {
 			// ParseInt supports hex, bin, and octal automatically when passed 0 base
@@ -185,19 +208,20 @@ func (p *Parser) parseNumber() int {
 	}
 
 	if err != nil {
-		panic("Number error")
+		panic("Number error (Too large?)")
 	}
 	// fmt.Println("Parsed number:", string(p.lex.This.Bytes), "->", strconv.Itoa(int(i64)))
 	// fmt.Printf("NUM: %o\t%s ->\t\t%o\n", p.lc, string(p.lex.This.Bytes), int(i64))
 	return int(i64)
-
 }
 
 func (p *Parser) parseExpression() (int, string) {
 	// fmt.Print("Parsing expression: ")
 	var start string = string(p.lex.This.Bytes)
 	var sign, operand string
-	if p.lex.This.Type == PUNCTUATION { // <+|->A formatted expression
+
+	if p.lex.This.Type == PUNCTUATION { // (<+|->A) OR (. [<+|-> B]) formatted expression
+
 		if p.lex.This.Bytes[0] == '.' { // (. [<+|-> B]) formatted expression
 			if p.lex.Next.Type == PUNCTUATION {
 				var a int = p.lc
@@ -235,7 +259,7 @@ func (p *Parser) parseExpression() (int, string) {
 			} else if p.lex.Next.Type == COMMENT || p.lex.Next.Type == EOL {
 				return p.lc, ""
 			}
-		} else {
+		} else { // <+|->A formatted expression
 			start = ""
 			sign = string(p.lex.This.Bytes)
 			p.lex.Advance()
@@ -293,7 +317,15 @@ func (p *Parser) parseExpression() (int, string) {
 		operand = string(p.lex.This.Bytes)
 		if isLetter(p.lex.This.Bytes[0]) {
 			osym := p.symtab.Get(operand)
-			b = osym.Val
+			if osym != nil {
+				b = osym.Val
+			} else {
+				// Skip to end of expression
+				for p.lex.This.Type != EOL {
+					p.lex.Advance()
+				}
+				return -1, start
+			}
 		} else if isDigit(p.lex.This.Bytes[0]) {
 			b = p.parseNumber()
 		} else {
@@ -323,16 +355,23 @@ func (p *Parser) parseExpression() (int, string) {
 			return (sSym.Val | eSym.Val), ""
 		}
 	} else if p.lex.Next.Type == COMMENT || p.lex.Next.Type == EOL { // (A) formatted expression
-		sym := p.symtab.Get(start)
-		if sym != nil {
-			// fmt.Printf("EXP: %o\t%s ->\t\t%o\n", p.lc, start, sym.Val)
-			return sym.Val, ""
+		if isLetter(p.lex.This.Bytes[0]) {
+			sym := p.symtab.Get(start)
+			if sym != nil {
+				// fmt.Printf("EXP: %o\t%s ->\t\t%o\n", p.lc, start, sym.Val)
+				return sym.Val, ""
+			}
+		} else if isDigit(p.lex.This.Bytes[0]) {
+			return p.parseNumber(), ""
+		} else {
+			panic("unknown expression operand")
 		}
+		return -1, start
 	} else {
 		panic("error: unknown syntax")
 	}
 
-	return -1, ""
+	return -1, "error"
 	// fmt.Printf("%s%s%s\n", start, sign, operand)
 }
 
@@ -340,8 +379,13 @@ func (p *Parser) parseSymbolDefinition() {
 	symbol := string(p.lex.This.Bytes)
 	p.lex.Advance() // Symbol to define
 	p.lex.Advance() // Equal sign '='
-	value := p.parseNumber()
-	p.symtab.Set(symbol, int(value))
+	value, str := p.parseExpression()
+	if str == "" {
+		p.symtab.Set(symbol, int(value))
+	} else {
+		fmt.Printf("Another pass required: %s (%s)\n", str, symbol)
+		p.apass = true
+	}
 }
 
 func (p *Parser) parseLabel() {

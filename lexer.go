@@ -169,7 +169,17 @@ func (l *Lexer) Advance() {
 		//Numbers contain digits
 		start := l.pos
 		l.pos++
-		for c := l.line[l.pos]; isDigit(c); {
+
+		var matchFunc func(c byte) bool = isDigit
+		if c := l.line[l.pos]; c == 'b' || c == 'o' || c == 'd' {
+			// Number base that only includes digits 0-9
+			l.pos++
+		} else if c == 'x' {
+			// Hex numbers can contain some letters as digits
+			matchFunc = isHexDigit
+			l.pos++
+		}
+		for c := l.line[l.pos]; matchFunc(c); {
 			l.pos++
 			if l.pos == len(l.line) {
 				break
@@ -232,7 +242,20 @@ func (l *Lexer) skipWhitespace() {
 }
 
 func isDigit(c byte) bool {
-	if (c >= '0' && c <= '9') || c == 'x' || c == 'b' || c == 'o' || c == 'd' {
+	if c >= '0' && c <= '9' {
+		return true
+	}
+	return false
+}
+
+func isHexDigit(c byte) bool {
+	if isDigit(c) ||
+		(c == 'a' || c == 'A') ||
+		(c == 'b' || c == 'B') ||
+		(c == 'c' || c == 'C') ||
+		(c == 'd' || c == 'D') ||
+		(c == 'e' || c == 'E') ||
+		(c == 'f' || c == 'F') {
 		return true
 	}
 	return false

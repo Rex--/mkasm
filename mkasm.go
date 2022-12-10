@@ -1,19 +1,93 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 )
 
-func main() {
+type CLIArgs struct {
+	ProgName  string
+	InFile    string
+	OutFile   string
+	CustomExt bool
 
-	if len(os.Args) < 3 {
-		fmt.Println("Usage:", os.Args[0], "<src_file> <out_file>")
+	Pobj bool
+	Ihex bool
+	Rim  bool
+	Bin  bool
+}
+
+func parseArgs() CLIArgs {
+
+	args := CLIArgs{}
+
+	// Set program name
+	args.ProgName = os.Args[0]
+
+	// Add flags
+	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
+	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
+
+	// Parse
+	flag.Parse()
+
+	// Get remaining positional arguments (infile [outfile])
+	if len(flag.Args()) == 1 {
+		args.InFile = flag.Arg(0)
+		// Get outfile based on in file
+		args.OutFile = strings.TrimSuffix(flag.Arg(0), path.Ext(flag.Arg(0)))
+	} else if len(flag.Args()) == 2 {
+		args.InFile = flag.Arg(0)
+		// Get the extension of the outfile and output in that format if known
+		ext := path.Ext(flag.Arg(1))
+		switch ext {
+		case ".rim":
+			fallthrough
+		case ".rm":
+			fallthrough
+		case ".RIM":
+			fallthrough
+		case ".RM":
+			args.Rim = true
+			args.OutFile = strings.TrimSuffix(flag.Arg(1), ext)
+
+		case ".pobj":
+			fallthrough
+		case ".po":
+			fallthrough
+		case ".PO":
+			args.Pobj = true
+			args.OutFile = strings.TrimSuffix(flag.Arg(1), ext)
+
+		default:
+			// Save the extension if we don't recognize it
+			args.CustomExt = true
+			args.OutFile = flag.Arg(1)
+		}
+	} else {
+		fmt.Println(os.Args[0], "[options] <src_file> <out_file>")
+		flag.Usage()
 		os.Exit(1)
 	}
 
+	// Set a default output format if we couldn't deduce one
+	if !args.Pobj && !args.Rim {
+		// Default currently is pobj because it's human readable
+		args.Pobj = true
+	}
+
+	return args
+}
+
+func main() {
+
+	args := parseArgs()
+
 	// Open file
-	srcFile, err := os.Open(os.Args[1])
+	srcFile, err := os.Open(args.InFile)
 	if err != nil {
 		panic(err)
 	}
@@ -26,11 +100,38 @@ func main() {
 	parser.mem.print()
 
 	// Open out file
-	outFile, err := os.Create(os.Args[2])
-	if err != nil {
-		panic(err)
+	// outFile, err := os.Create(args.OutFile)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer outFile.Close()
+
+	// Write output file in specified format(s)
+	if args.Pobj {
+		outPath := args.OutFile
+		if !args.CustomExt {
+			outPath += ".po"
+		}
+		outFile, err := os.Create(outPath)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Writing PObj output file:", outPath)
+		parser.mem.exportPObject(outFile)
+		outFile.Close()
 	}
-	defer outFile.Close()
-	// Write object file
-	parser.mem.exportPObject(outFile)
+
+	if args.Rim {
+		outPath := args.OutFile
+		if !args.CustomExt {
+			outPath += ".rim"
+		}
+		outFile, err := os.Create(outPath)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Writing RIM output file:", outPath)
+		parser.mem.exportRim(outFile)
+		outFile.Close()
+	}
 }
