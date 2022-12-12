@@ -20,6 +20,12 @@ type CLIArgs struct {
 	Bin  bool
 }
 
+func printUsage() {
+	fmt.Println("Usage:", os.Args[0], "[options] <src_file> [out_file]")
+	fmt.Printf("\nOptions:\n")
+	flag.PrintDefaults()
+}
+
 func parseArgs() CLIArgs {
 
 	args := CLIArgs{}
@@ -27,12 +33,20 @@ func parseArgs() CLIArgs {
 	// Set program name
 	args.ProgName = os.Args[0]
 
+	flag.Usage = printUsage
+
 	// Add flags
 	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
+	help := flag.Bool("help", false, "Print this message and exit")
 
 	// Parse
 	flag.Parse()
+
+	if *help {
+		flag.Usage()
+		os.Exit(0)
+	}
 
 	// Get remaining positional arguments (infile [outfile])
 	if len(flag.Args()) == 1 {
@@ -68,7 +82,6 @@ func parseArgs() CLIArgs {
 			args.OutFile = flag.Arg(1)
 		}
 	} else {
-		fmt.Println(os.Args[0], "[options] <src_file> <out_file>")
 		flag.Usage()
 		os.Exit(1)
 	}
