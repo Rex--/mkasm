@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"os"
 )
 
@@ -13,6 +14,8 @@ const (
 	PUNCTUATION
 	NUMBER
 	COMMENT
+	STRING
+	CHAR
 	EOL
 	EOF
 	UNKNOWN
@@ -139,6 +142,57 @@ func (l *Lexer) Advance() {
 		return // Bail early
 	}
 
+	// Check for double quoted strings
+	if l.line[l.pos] == '"' {
+		l.Next.Type = STRING
+		start := l.pos
+		l.pos++
+		for c := l.line[l.pos]; c != '"'; {
+			l.pos++
+			if l.pos >= len(l.line) {
+				break
+			} else {
+				c = l.line[l.pos]
+			}
+		}
+
+		if l.line[l.pos] == '"' { // Include trailing "
+			l.pos++
+			l.Next.Bytes = l.line[start:l.pos]
+		} else {
+			panic("unterminated string")
+		}
+		return // Bail
+	}
+
+	// Check for single quoted characters
+	if l.line[l.pos] == '\'' {
+		l.Next.Type = CHAR
+		start := l.pos
+		l.pos++                    // Skip leading '
+		if l.line[l.pos] == '\\' { // Catch characters escaped with \
+			l.pos++
+			valid := isEscaped(l.line[l.pos])
+			if !valid {
+				panic("unknown char")
+			}
+		}
+		l.pos++
+
+		fmt.Println(string(l.line))
+		fmt.Println(string(l.line[l.pos]))
+
+		// Check for ending ' (not required)
+		if l.line[l.pos] == '\'' {
+			l.Next.Bytes = l.line[start : l.pos+1]
+		} else if isWhitespace(l.line[l.pos]) {
+			panic("no char")
+		}
+		l.pos++
+		return // Bail
+
+	}
+
 	// Check for valid punctuation lexemes
 	if p := l.line[l.pos]; p == '=' || p == '*' || p == ',' || p == '.' || p == '-' || p == '+' {
 		l.Next.Type = PUNCTUATION
@@ -231,7 +285,7 @@ func (l *Lexer) skipWhitespace() {
 	if l.pos == leng || l.pos == -1 {
 		return // Bail early if pointer is at end of line or file
 	}
-	for c := l.line[l.pos]; c == ' ' || c == '\t'; {
+	for c := l.line[l.pos]; isWhitespace(c); {
 		l.pos++
 		if l.pos == leng {
 			break
@@ -239,6 +293,13 @@ func (l *Lexer) skipWhitespace() {
 			c = l.line[l.pos]
 		}
 	}
+}
+
+func isWhitespace(c byte) bool {
+	if c == ' ' || c == '\t' {
+		return true
+	}
+	return false
 }
 
 func isDigit(c byte) bool {
@@ -273,4 +334,13 @@ func isAlphaNum(c byte) bool {
 		return true
 	}
 	return false
+}
+
+func isEscaped(c byte) bool {
+
+	if c == 'n' || c == 'r' || c == 't' {
+		return true
+	} else {
+		return false
+	}
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 type InstType int
@@ -164,6 +165,56 @@ loop:
 		case NUMBER:
 			inst := p.parseNumber()
 			p.mem[p.lc] = inst
+			p.lc++
+
+		case CHAR:
+			var c byte
+			rawC := strings.Trim(string(p.lex.This.Bytes), "'")
+			fmt.Println(string(rawC))
+			switch rawC {
+			case "\\n":
+				c = '\n'
+			case "\\r":
+				c = '\r'
+			case "\\t":
+				c = '\t'
+			default:
+				if len(rawC) > 1 {
+					panic("Syntax error: unknown escaped char")
+				}
+				c = byte(rawC[0])
+			}
+			p.mem[p.lc] = int(c)
+			p.lc++
+
+		case STRING:
+			rawStr := p.lex.This.Bytes[1 : len(p.lex.This.Bytes)-1] // Raw string doesn't contain quotes
+			for i := 0; ; i++ {                                     // Place characters in consecutive memory locations
+				if i >= len(rawStr) {
+					break
+				}
+
+				c := rawStr[i]
+				if c == '\\' {
+					i++
+					switch ec := rawStr[i]; ec {
+					case 'n':
+						c = '\n'
+					case 'r':
+						c = '\r'
+					case 't':
+						c = '\t'
+					case '\\':
+						c = '\\'
+					default:
+						panic("Unknown escaped char in string")
+					}
+				}
+				p.mem[p.lc] = int(c)
+				p.lc++
+			}
+
+			p.mem[p.lc] = 0 // Add null terminator
 			p.lc++
 
 		case EOF:
