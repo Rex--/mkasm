@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"os"
 )
 
@@ -34,6 +33,8 @@ type Lexeme struct {
 }
 
 type Lexer struct {
+	// Th previous lexeme that was parsed
+	Prev Lexeme
 	// The current lexeme being parsed
 	This Lexeme
 	// The next lexeme to be parsed
@@ -50,6 +51,9 @@ type Lexer struct {
 	line []byte
 	// Scan position in line
 	pos int
+
+	// Buffer to hold the previous line for easy error reporting
+	prevLine []byte
 }
 
 func NewLexer(f *os.File) (l *Lexer) {
@@ -93,6 +97,7 @@ func (l *Lexer) Reset() {
 // Advance the current lexeme by one position, moving next -> this and reading
 // a new lexeme into next
 func (l *Lexer) Advance() {
+	l.Prev = l.This
 	l.This = l.Next
 	l.Next.Type = UNKNOWN
 	l.Next.Bytes = nil
@@ -156,11 +161,13 @@ func (l *Lexer) Advance() {
 			}
 		}
 
-		if l.line[l.pos] == '"' { // Include trailing "
+		if l.pos < len(l.line) && l.line[l.pos] == '"' { // Include trailing "
 			l.pos++
 			l.Next.Bytes = l.line[start:l.pos]
 		} else {
-			panic("unterminated string")
+			l.Next.Bytes = l.line[start:l.pos]
+			l.UnknownLexeme(&l.Next, -1, "unterminated string")
+			// panic("unterminated string")
 		}
 		return // Bail
 	}
@@ -172,21 +179,25 @@ func (l *Lexer) Advance() {
 		l.pos++                    // Skip leading '
 		if l.line[l.pos] == '\\' { // Catch characters escaped with \
 			l.pos++
-			valid := isEscaped(l.line[l.pos])
-			if !valid {
-				panic("unknown char")
-			}
+			// valid := isEscaped(l.line[l.pos])
+			// if !valid {
+			// 	l.UnknownLexeme(&l.Next, l.pos+1, "unknown escaped character")
+			// 	// panic("unknown char")
+			// }
 		}
-		l.pos++
 
-		fmt.Println(string(l.line))
-		fmt.Println(string(l.line[l.pos]))
+		l.pos++ // Skip the character
+
+		// fmt.Println(string(l.line))
+		// fmt.Println(string(l.line[l.pos]))
 
 		// Check for ending ' (not required)
 		if l.line[l.pos] == '\'' {
 			l.Next.Bytes = l.line[start : l.pos+1]
 		} else if isWhitespace(l.line[l.pos]) {
-			panic("no char")
+			l.Next.Bytes = l.line[start:l.pos]
+		} else {
+			l.UnknownLexeme(&l.Next, l.pos, "unknown character")
 		}
 		l.pos++
 		return // Bail
@@ -270,6 +281,7 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
 // Reads the current line into buffer
 func (l *Lexer) readLine() {
+	l.prevLine = l.line
 	if l.s.Scan() {
 		l.line = l.s.Bytes()
 		l.pos = 0
@@ -336,11 +348,10 @@ func isAlphaNum(c byte) bool {
 	return false
 }
 
-func isEscaped(c byte) bool {
-
-	if c == 'n' || c == 'r' || c == 't' {
-		return true
-	} else {
-		return false
-	}
-}
+// func isEscaped(c byte) bool {
+// 	if c == 'n' || c == 'r' || c == 't' || c == '\\' {
+// 		return true
+// 	} else {
+// 		return false
+// 	}
+// }

@@ -89,8 +89,17 @@ func (m Memory) print() {
 	}
 	sort.Ints(keys)
 
+	fmt.Println("\n       Address       |     Instruction     ")
+	fmt.Println("---------------------|---------------------")
+	lastAddr := keys[0]
 	for _, addr := range keys {
+		if addr-lastAddr > 1 {
+			fmt.Printf("%21s:%21s\n", "", "")
+		}
 		inst := m[addr]
-		fmt.Printf("%.12b\t%.4o | %.4o\t%.12b\n", addr, addr, inst, inst)
+		fmt.Printf("%.12b    %.4o | %.4o    %.12b\n", addr, addr, inst, inst)
+		lastAddr = addr
 	}
+	// fmt.Println("-------------------------------------------")
+	fmt.Println()
 }

@@ -18,6 +18,8 @@ type CLIArgs struct {
 	Ihex bool
 	Rim  bool
 	Bin  bool
+
+	Dump bool
 }
 
 func printUsage() {
@@ -38,6 +40,7 @@ func parseArgs() CLIArgs {
 	// Add flags
 	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
+	flag.BoolVar(&args.Dump, "dump", false, "Dump assembled program to stdout")
 	help := flag.Bool("help", false, "Print this message and exit")
 
 	// Parse
@@ -110,7 +113,9 @@ func main() {
 	parser := NewParser(lexer, &default_symbols)
 	parser.parseP8Assembly()
 
-	parser.mem.print()
+	if args.Dump {
+		parser.mem.print()
+	}
 
 	// Open out file
 	// outFile, err := os.Create(args.OutFile)
