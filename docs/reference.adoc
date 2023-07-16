@@ -1,0 +1,108 @@
+
+== Memory Reference Instructions
+
+.Memory Reference Instructions
+[frame=ends,grid=none,cols="1,1,1"]
+|===
+|Symbol |Code |Operation
+
+|`AND Y`
+|0000 - 0b000IPYYYYYYY
+|CA & AC -> AC
+
+|TAD Y
+|1000 - 0b001IPYYYYYYY
+|CA + AC -> AC
+
+|ISZ Y
+|2000 - 0b010IPYYYYYYY
+|CA + 1 -> EA; Skip if CA == 0
+
+|DCA Y
+|3xxx - 0b011IPYYYYYYY
+|AC -> EA; 0 -> AC
+
+|JMS Y
+|4xxx - 0b100IPYYYYYYY
+|PC( + 1?) -> EA; EA + 1 -> PC
+
+|JMP Y
+|5xxx - 0b101IPYYYYYYY
+|EA -> PC
+|===
+
+== Operate Instructions
+
+.Group 1 Operate Microinstructions
+[frame=ends,grid=none,cols="1,1,1"]
+|===
+|Symbol |Code | Operation
+
+|NOP
+|7000 - 0b111000000000
+|No operation.
+
+|IAC
+|7001 - 0b111000000001
+|Increment AC.
+
+|RAL
+|7004 - 0b111000000100
+|Rotate AC and L left *one* place.
+
+|RAR
+|7010 - 0b111000001000
+|Rotate AC and L right *one* place.
+
+|RTL \| RTR
+|7002 - 0b111000000010
+|Rotate AC and L *two* places.
+
+|CML
+|7020 - 0b111000010000
+|Complement L.
+
+|CMA
+|7040
+|Complement AC. (One's complement)
+
+|CIA
+|7041
+|Complement and increment AC. (Two's complement)
+
+|CLL
+|7100
+|Clear L.
+
+|CLA
+|7200
+|Clear AC.
+|===
+
+.Group 2 Operate Microinstructions
+[frame=ends,grid=none,cols="1,1,1"]
+|===
+|Symbol |Code | Operation
+
+|HLT
+|7402 - 0b111100000010
+|Halt the computer.
+|===
+
+<<<
+
+== IOT Instructions
+
+.Basic IOT Microinstructions
+[frame=ends,grid=none,cols="1,1,1"]
+|===
+|Symbol |Code (octal) | Operation
+
+|ION
+|6001
+|Enable interrupts.
+
+|IOF
+|6002
+|Disable interrupts.
+|===
