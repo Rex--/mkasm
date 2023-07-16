@@ -3,8 +3,9 @@ package main
 type SymType int
 
 const (
-	SI SymType = iota
+	PSEUDO SymType = iota
 	MRI
+	SI
 	LABEL
 )
 
@@ -43,10 +44,10 @@ func (st *SymbolTable) Label(symbol string, val int) {
 }
 
 var default_symbols SymbolTable = SymbolTable{
-	// Entry Vectors
-	"vINT":   Symbol{LABEL, 0o0},
-	"vAUTO":  Symbol{LABEL, 0o10},
-	"vRESET": Symbol{LABEL, 0o200},
+	// Pseudo instructions
+	"EXPUNGE": Symbol{PSEUDO, -1},
+	"FIXTAB":  Symbol{PSEUDO, -1},
+	"FIXMRI":  Symbol{PSEUDO, -1},
 
 	// Memory reference instructions
 	"AND": Symbol{MRI, 0},

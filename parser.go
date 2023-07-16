@@ -93,6 +93,11 @@ loop:
 			}
 
 		case SYMBOL:
+
+			// switch (p.lex.This.Bytes) {
+			// case :
+			// 	break
+			// }
 			if p.lex.Next.Type == PUNCTUATION && p.lex.Next.Bytes[0] != '.' { // Symbol definition
 				switch p.lex.Next.Bytes[0] {
 				case '=':
