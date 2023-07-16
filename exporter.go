@@ -73,6 +73,35 @@ func (m Memory) exportRim(w io.Writer) {
 	}
 }
 
+var urlBase = "http://localhost:8000/grid.html"
+
+func (m Memory) exportURL() {
+	keys := make([]int, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+
+	link := urlBase + "?core="
+	var lastAddr int = -1
+	for i, addr := range keys {
+		// Write change of address line
+		if addr > lastAddr+1 {
+			link += fmt.Sprintf("*0%o,", addr)
+		}
+		if i == len(keys)-1 {
+			// Write last instruction word
+			link += fmt.Sprintf("0%o", m[addr])
+		} else {
+			// Write instruction word
+			link += fmt.Sprintf("0%o,", m[addr])
+		}
+		// Update last address
+		lastAddr = addr
+	}
+	fmt.Println(link)
+}
+
 // func (m Memory) exportHexfile(w io.Writer) {
 // 	keys := make([]int, 0, len(m))
 // 	for k := range m {

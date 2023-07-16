@@ -18,6 +18,7 @@ type CLIArgs struct {
 	Ihex bool
 	Rim  bool
 	Bin  bool
+	URL  bool
 
 	Dump bool
 }
@@ -40,6 +41,7 @@ func parseArgs() CLIArgs {
 	// Add flags
 	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
+	flag.BoolVar(&args.URL, "url", false, "Output as encoded url")
 	flag.BoolVar(&args.Dump, "dump", false, "Dump assembled program to stdout")
 	help := flag.Bool("help", false, "Print this message and exit")
 
@@ -90,7 +92,7 @@ func parseArgs() CLIArgs {
 	}
 
 	// Set a default output format if we couldn't deduce one
-	if !args.Pobj && !args.Rim {
+	if !args.Pobj && !args.Rim && !args.URL {
 		// Default currently is pobj because it's human readable
 		args.Pobj = true
 	}
@@ -151,5 +153,10 @@ func main() {
 		fmt.Println("Writing RIM output file:", outPath)
 		parser.mem.exportRim(outFile)
 		outFile.Close()
+	}
+
+	if args.URL {
+		fmt.Println("Output URL:")
+		parser.mem.exportURL()
 	}
 }
