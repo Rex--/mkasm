@@ -42,6 +42,8 @@ type Lexer struct {
 
 	// File
 	f *os.File
+	// Command line arguments
+	args *CLIArgs
 	// Lexer line scanner
 	s *bufio.Scanner
 
@@ -56,11 +58,12 @@ type Lexer struct {
 	prevLine []byte
 }
 
-func NewLexer(f *os.File) (l *Lexer) {
+func NewLexer(f *os.File, args *CLIArgs) (l *Lexer) {
 	l = new(Lexer)
 
 	// Save file object for reference
 	l.f = f
+	l.args = args
 
 	// Create a new scanner on our reader and set our custom splitLine function
 	l.s = bufio.NewScanner(f)
@@ -147,61 +150,64 @@ func (l *Lexer) Advance() {
 		return // Bail early
 	}
 
-	// Check for double quoted strings
-	if l.line[l.pos] == '"' {
-		l.Next.Type = STRING
-		start := l.pos
-		l.pos++
-		for c := l.line[l.pos]; c != '"'; {
+	if l.args.LangPalD { // PAL-D doesn't actually support this
+
+		// Check for double quoted strings
+		if l.line[l.pos] == '"' {
+			l.Next.Type = STRING
+			start := l.pos
 			l.pos++
-			if l.pos >= len(l.line) {
-				break
-			} else {
-				c = l.line[l.pos]
+			for c := l.line[l.pos]; c != '"'; {
+				l.pos++
+				if l.pos >= len(l.line) {
+					break
+				} else {
+					c = l.line[l.pos]
+				}
 			}
+
+			if l.pos < len(l.line) && l.line[l.pos] == '"' { // Include trailing "
+				l.pos++
+				l.Next.Bytes = l.line[start:l.pos]
+			} else {
+				l.Next.Bytes = l.line[start:l.pos]
+				l.UnknownLexeme(&l.Next, -1, "unterminated string")
+				// panic("unterminated string")
+			}
+			return // Bail
 		}
 
-		if l.pos < len(l.line) && l.line[l.pos] == '"' { // Include trailing "
-			l.pos++
-			l.Next.Bytes = l.line[start:l.pos]
-		} else {
-			l.Next.Bytes = l.line[start:l.pos]
-			l.UnknownLexeme(&l.Next, -1, "unterminated string")
-			// panic("unterminated string")
-		}
-		return // Bail
-	}
-
-	// Check for single quoted characters
-	if l.line[l.pos] == '\'' {
-		l.Next.Type = CHAR
-		start := l.pos
-		l.pos++                    // Skip leading '
-		if l.line[l.pos] == '\\' { // Catch characters escaped with \
-			l.pos++
-			// valid := isEscaped(l.line[l.pos])
-			// if !valid {
-			// 	l.UnknownLexeme(&l.Next, l.pos+1, "unknown escaped character")
-			// 	// panic("unknown char")
-			// }
-		}
-
-		l.pos++ // Skip the character
-
-		// fmt.Println(string(l.line))
-		// fmt.Println(string(l.line[l.pos]))
-
-		// Check for ending ' (not required)
+		// Check for single quoted characters
 		if l.line[l.pos] == '\'' {
-			l.Next.Bytes = l.line[start : l.pos+1]
-		} else if isWhitespace(l.line[l.pos]) {
-			l.Next.Bytes = l.line[start:l.pos]
-		} else {
-			l.UnknownLexeme(&l.Next, l.pos, "unknown character")
-		}
-		l.pos++
-		return // Bail
+			l.Next.Type = CHAR
+			start := l.pos
+			l.pos++                    // Skip leading '
+			if l.line[l.pos] == '\\' { // Catch characters escaped with \
+				l.pos++
+				// valid := isEscaped(l.line[l.pos])
+				// if !valid {
+				// 	l.UnknownLexeme(&l.Next, l.pos+1, "unknown escaped character")
+				// 	// panic("unknown char")
+				// }
+			}
 
+			l.pos++ // Skip the character
+
+			// fmt.Println(string(l.line))
+			// fmt.Println(string(l.line[l.pos]))
+
+			// Check for ending ' (not required)
+			if l.line[l.pos] == '\'' {
+				l.Next.Bytes = l.line[start : l.pos+1]
+			} else if isWhitespace(l.line[l.pos]) {
+				l.Next.Bytes = l.line[start:l.pos]
+			} else {
+				l.UnknownLexeme(&l.Next, l.pos, "unknown character")
+			}
+			l.pos++
+			return // Bail
+
+		}
 	}
 
 	// Check for valid punctuation lexemes
@@ -256,8 +262,9 @@ func (l *Lexer) Advance() {
 
 	} else {
 		// Invalid character
-		l.Next.Bytes = l.line[l.pos : l.pos+1]
-		l.pos++
+		l.UnknownLexeme(&l.This, l.pos+1, "unknown character")
+		// l.Next.Bytes = l.line[l.pos : l.pos+1]
+		// l.pos++
 	}
 }
 

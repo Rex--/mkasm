@@ -14,6 +14,10 @@ type CLIArgs struct {
 	OutFile   string
 	CustomExt bool
 
+	LangVer  byte
+	LangPal3 bool
+	LangPalD bool
+
 	Pobj bool
 	Ihex bool
 	Rim  bool
@@ -39,6 +43,8 @@ func parseArgs() CLIArgs {
 	flag.Usage = printUsage
 
 	// Add flags
+	flag.BoolVar(&args.LangPal3, "3", true, "Only support PAL-III syntax.")
+	flag.BoolVar(&args.LangPalD, "D", false, "Support additional PAL-D syntax.")
 	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
 	flag.BoolVar(&args.URL, "url", false, "Output as encoded url")
@@ -97,6 +103,14 @@ func parseArgs() CLIArgs {
 		args.Pobj = true
 	}
 
+	// Set a language version
+	if args.LangPalD {
+		args.LangVer = 'D'
+		args.LangPal3 = false
+	} else {
+		args.LangVer = '3'
+	}
+
 	return args
 }
 
@@ -111,7 +125,7 @@ func main() {
 	}
 	defer srcFile.Close()
 
-	lexer := NewLexer(srcFile)
+	lexer := NewLexer(srcFile, &args)
 	parser := NewParser(lexer, &default_symbols)
 	parser.parseP8Assembly()
 
