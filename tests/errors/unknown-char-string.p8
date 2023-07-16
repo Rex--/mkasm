@@ -1,0 +1,2 @@
+
+ERRSTRNG,   "Error, World!\e"
