@@ -56,6 +56,7 @@ func (p *Parser) parseP8Assembly() {
 	// for i, sym := range *defaults {
 	// 	p.symtab[i] = sym
 	// }
+	p.ResetErrors()
 loop:
 	for {
 		p.lex.Advance()
@@ -69,9 +70,10 @@ loop:
 			case '*': // Asterisk means Next sets the location counter
 				p.lex.Advance()
 				var str string
+				addrExpr := p.lex.This
 				p.lc, str = p.parseExpression()
 				if str != "" {
-					p.SyntaxError(&p.lex.Prev, -1, "undefined symbol used as program counter address")
+					p.SyntaxError(&addrExpr, "undefined symbol used as program counter address")
 					// panic("Unknown symbol: " + str)
 				}
 				// fmt.Printf("Setting location counter: %o\n", p.lc)
@@ -118,35 +120,49 @@ loop:
 				sym := p.symtab.Get(string(p.lex.This.Bytes))
 				if sym != nil && sym.Type == MRI {
 					// Memory reference instruction
+					// mriSym := p.lex.This
 					// symStr := string(p.lex.This.Bytes)
 					p.lex.Advance()
 					// var oprStr string
 					var indirect, zeroPage bool
-					// Check for (I)ndirect flag
-					if p.lex.This.Type == SYMBOL && p.lex.This.Bytes[0] == 'I' && len(p.lex.This.Bytes) == 1 {
-						// oprStr += "I"
-						indirect = true
-						p.lex.Advance()
-					}
-					// Check for (Z)ero page flag
-					if p.lex.This.Type == SYMBOL && p.lex.This.Bytes[0] == 'Z' && len(p.lex.This.Bytes) == 1 {
-						// oprStr += " Z"
-						zeroPage = true
+					// Check for (I)ndirect flag and (Z)ero page flag
+					for p.lex.This.Type == SYMBOL && len(p.lex.This.Bytes) == 1 && (p.lex.This.Bytes[0] == 'I' || p.lex.This.Bytes[0] == 'Z') {
+						// Check for (I)ndirect flag
+						if p.lex.This.Bytes[0] == 'I' {
+							// oprStr += "I"
+							indirect = true
+						}
+						// Check for (Z)ero page flag
+						if p.lex.This.Bytes[0] == 'Z' {
+							// oprStr += " Z"
+							zeroPage = true
+						}
 						p.lex.Advance()
 					}
 					// Parse expression of address operand
+					exprStart := p.lex.This
 					result, expr := p.parseExpression()
 					if expr != "" {
 						// fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
-						if indirect {
-							result |= 0b000100000000
+						// Check if address is valid to reference
+						// This means either in the zero page or in the current page.
+						addrPage := result & 0b111110000000
+						if addrPage == 0 {
+							// Zero page reference
+							zeroPage = true
+						} else if addrPage != p.lc&0b111110000000 {
+							// Out of page reference: throw error
+							p.IllegalReferenceError(&exprStart, "out of bounds: '"+strconv.FormatInt(int64(result), 8)+"'")
 						}
-						if zeroPage {
-							result &= 0b111101111111
-						} else {
+
+						result &= 0b000001111111 // Truncate address to 7 bits
+						if !zeroPage {           // Set current page bit if not accessing zero page
 							result |= 0b000010000000
+						}
+						if indirect { // Set indirect bit
+							result |= 0b000100000000
 						}
 						result |= sym.Val
 						p.mem[p.lc] = result
@@ -189,8 +205,7 @@ loop:
 				c = '\\'
 			default:
 				if len(rawC) > 1 {
-					p.SyntaxError(&p.lex.This, -1, "unknown character")
-					// panic("Syntax error: unknown escaped char")
+					p.SyntaxError(&p.lex.This, "unsupported escaped character")
 				}
 				c = byte(rawC[0])
 			}
@@ -217,7 +232,7 @@ loop:
 					case '\\':
 						c = '\\'
 					default:
-						p.SyntaxError(&p.lex.This, p.lex.This.Col+i+1, "unknown character in string")
+						p.SyntaxError(&p.lex.This, "unknown character in string")
 						// panic("Unknown escaped char in string")
 					}
 				}
@@ -242,11 +257,17 @@ loop:
 		p.lc = 0
 		p.apass = false
 		p.undef = make([]Lexeme, 0)
+		// Reset Errors
+		p.ResetErrors()
 		goto loop
 
 	} else if p.pdepth >= p.mdepth {
 		p.UndefinedSymbols()
 		// panic("parsing failed: undefined symbols")
+	}
+
+	if p.HasErrors() {
+		p.PrintErrors()
 	}
 }
 
@@ -307,7 +328,7 @@ func (p *Parser) parseExpression() (int, string) {
 				} else if isDigit(p.lex.This.Bytes[0]) { // Parse number
 					b = p.parseNumber()
 				} else {
-					p.SyntaxError(&p.lex.This, -1, "unknown operand in expression")
+					p.SyntaxError(&p.lex.This, "unknown operand in expression")
 					// panic("unknown expression operand")
 				}
 
@@ -318,7 +339,7 @@ func (p *Parser) parseExpression() (int, string) {
 				case "+":
 					ans = a + b
 				default:
-					p.SyntaxError(&signL, -1, "unknown operator in expression")
+					p.SyntaxError(&signL, "unknown operator in expression")
 					// panic("unknown operation")
 				}
 				// fmt.Printf("OPR: %o\t%s%s%s\t%o\n", p.lc, start, sign, operand, ans)
@@ -346,7 +367,7 @@ func (p *Parser) parseExpression() (int, string) {
 			} else if isDigit(p.lex.This.Bytes[0]) { // Parse number
 				a = p.parseNumber()
 			} else {
-				p.SyntaxError(&p.lex.This, -1, "unknown operand in expression")
+				p.SyntaxError(&p.lex.This, "unknown operand in expression")
 				// panic("unknown expression operand")
 			}
 
@@ -357,7 +378,7 @@ func (p *Parser) parseExpression() (int, string) {
 			case "+":
 				ans = a
 			default:
-				p.SyntaxError(&signL, -1, "unknown operator in expression")
+				p.SyntaxError(&signL, "unknown operator in expression")
 				// panic("unknown operation")
 			}
 
@@ -382,7 +403,7 @@ func (p *Parser) parseExpression() (int, string) {
 		} else if isDigit(p.lex.This.Bytes[0]) { // Parse number
 			a = p.parseNumber()
 		} else {
-			p.SyntaxError(&p.lex.This, -1, "unknown operand in expression")
+			p.SyntaxError(&p.lex.This, "unknown operand in expression")
 			// panic("unknown expression operand")
 		}
 		p.lex.Advance()
@@ -407,8 +428,7 @@ func (p *Parser) parseExpression() (int, string) {
 		} else if isDigit(p.lex.This.Bytes[0]) {
 			b = p.parseNumber()
 		} else {
-			p.SyntaxError(&p.lex.This, -1, "unknown operand in expression")
-			// panic("unknown expression operand")
+			p.SyntaxError(&p.lex.This, "unknown operand in expression")
 		}
 
 		var answer int
@@ -418,8 +438,7 @@ func (p *Parser) parseExpression() (int, string) {
 		case "+":
 			answer = (a + b)
 		default:
-			p.SyntaxError(&signL, -1, "unknown operator in expression")
-			// panic("unsupported operation in expression")
+			p.SyntaxError(&signL, "unknown operator in expression")
 		}
 
 		// Convert negative to 12-bit twos-complement
@@ -461,13 +480,11 @@ func (p *Parser) parseExpression() (int, string) {
 		} else if isDigit(p.lex.This.Bytes[0]) {
 			return p.parseNumber(), ""
 		} else {
-			p.SyntaxError(&p.lex.This, -1, "unknown operand in expression")
-			// panic("unknown expression operand " + string(p.lex.This.Bytes) + strconv.Itoa(int(p.lex.This.Type)))
+			p.SyntaxError(&p.lex.This, "unknown operand in expression")
 		}
 		return -1, start
 	} else {
-		p.SyntaxError(&p.lex.This, -1, "unknown expression")
-		// panic("error: unknown syntax")
+		p.SyntaxError(&p.lex.This, "unknown expression")
 	}
 
 	return -1, "error"

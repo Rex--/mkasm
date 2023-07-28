@@ -42,6 +42,8 @@ type Lexer struct {
 
 	// File
 	f *os.File
+	// File to use for error printing
+	ferr *os.File
 	// Command line arguments
 	args *CLIArgs
 	// Lexer line scanner
@@ -64,6 +66,12 @@ func NewLexer(f *os.File, args *CLIArgs) (l *Lexer) {
 	// Save file object for reference
 	l.f = f
 	l.args = args
+
+	ferr, err := os.Open(args.InFile)
+	if err != nil {
+		panic(err)
+	}
+	l.ferr = ferr
 
 	// Create a new scanner on our reader and set our custom splitLine function
 	l.s = bufio.NewScanner(f)
@@ -199,12 +207,12 @@ func (l *Lexer) Advance() {
 			// Check for ending ' (not required)
 			if l.line[l.pos] == '\'' {
 				l.Next.Bytes = l.line[start : l.pos+1]
-			} else if isWhitespace(l.line[l.pos]) {
+				l.pos++
+			} else if isWhitespace(l.line[l.pos]) || l.line[l.pos] == '\n' || l.line[l.pos] == ';' {
 				l.Next.Bytes = l.line[start:l.pos]
 			} else {
 				l.UnknownLexeme(&l.Next, l.pos, "unknown character")
 			}
-			l.pos++
 			return // Bail
 
 		}

@@ -25,6 +25,8 @@ type CLIArgs struct {
 	URL  bool
 
 	Dump bool
+
+	ErrCtx int
 }
 
 func printUsage() {
@@ -49,6 +51,7 @@ func parseArgs() CLIArgs {
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
 	flag.BoolVar(&args.URL, "url", false, "Output as encoded url")
 	flag.BoolVar(&args.Dump, "dump", false, "Dump assembled program to stdout")
+	flag.IntVar(&args.ErrCtx, "err-ctx", 0, "Lines of context surrounding errors")
 	help := flag.Bool("help", false, "Print this message and exit")
 
 	// Parse
