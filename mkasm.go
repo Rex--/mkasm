@@ -24,7 +24,8 @@ type CLIArgs struct {
 	Bin  bool
 	URL  bool
 
-	Dump bool
+	Listing bool
+	Dump    bool
 
 	ErrCtx int
 }
@@ -51,6 +52,7 @@ func parseArgs() CLIArgs {
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
 	flag.BoolVar(&args.URL, "url", false, "Output as encoded url")
 	flag.BoolVar(&args.Dump, "dump", false, "Dump assembled program to stdout")
+	flag.BoolVar(&args.Listing, "list", false, "Generate program listing file")
 	flag.IntVar(&args.ErrCtx, "err-ctx", 0, "Lines of context surrounding errors")
 	help := flag.Bool("help", false, "Print this message and exit")
 
@@ -133,7 +135,7 @@ func main() {
 	parser.parseP8Assembly()
 
 	if args.Dump {
-		parser.mem.print()
+		parser.mem.exportListing(os.Stdout, parser.listing)
 	}
 
 	// Open out file
@@ -175,5 +177,17 @@ func main() {
 	if args.URL {
 		fmt.Println("Output URL:")
 		parser.mem.exportURL()
+	}
+
+	// Generate listing file
+	if args.Listing {
+		outPath := strings.TrimSuffix(args.InFile, path.Ext(args.InFile)) + ".lst"
+		outFile, err := os.Create(outPath)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Writing program listing:", outPath)
+		parser.mem.exportListing(outFile, parser.listing)
+		outFile.Close()
 	}
 }

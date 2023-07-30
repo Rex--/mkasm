@@ -21,24 +21,26 @@ import (
 // }
 
 type Parser struct {
-	lex    *Lexer
-	symtab *SymbolTable
-	lc     int
-	mem    Memory
-	undef  []Lexeme // Undefined symbols for last pass
-	apass  bool     // Another Pass?
-	pdepth int      // Parsed depth
-	mdepth int      // Max depth
+	lex     *Lexer
+	symtab  *SymbolTable
+	lc      int
+	mem     Memory
+	listing map[int][]byte
+	undef   []Lexeme // Undefined symbols for last pass
+	apass   bool     // Another Pass?
+	pdepth  int      // Parsed depth
+	mdepth  int      // Max depth
 }
 
 func NewParser(l *Lexer, st *SymbolTable) *Parser {
 	// Create our parser
 	return &Parser{
-		lex:    l,
-		symtab: st,
-		lc:     0o200,
-		mem:    make(Memory),
-		mdepth: 100,
+		lex:     l,
+		symtab:  st,
+		lc:      0o200,
+		mem:     make(Memory),
+		listing: make(map[int][]byte),
+		mdepth:  100,
 	}
 }
 
@@ -89,9 +91,9 @@ loop:
 					// p.undef = append(p.undef, expr)
 					p.apass = true
 				} else {
-					p.mem[p.lc] = inst
+					p.addInstruction(inst)
 				}
-				p.lc++
+				// p.lc++
 			}
 
 		case SYMBOL:
@@ -110,9 +112,9 @@ loop:
 						// fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
-						p.mem[p.lc] = inst
+						p.addInstruction(inst)
 					}
-					p.lc++
+					// p.lc++
 				}
 
 			} else { // Were using the symbol
@@ -165,7 +167,7 @@ loop:
 							result |= 0b000100000000
 						}
 						result |= sym.Val
-						p.mem[p.lc] = result
+						p.addInstruction(result)
 						// fmt.Printf("MRI: %s %s %o %b\n", string(p.lex.This.Bytes), oprStr, result, result)
 					}
 				} else {
@@ -174,10 +176,10 @@ loop:
 						// fmt.Println("Another pass required:", expr)
 						p.apass = true
 					} else {
-						p.mem[p.lc] = inst
+						p.addInstruction(inst)
 					}
 				}
-				p.lc++
+				// p.lc++
 			}
 
 		case NUMBER:
@@ -186,9 +188,9 @@ loop:
 				// fmt.Println("Another pass required:", expr)
 				p.apass = true
 			} else {
-				p.mem[p.lc] = inst
+				p.addInstruction(inst)
 			}
-			p.lc++
+			// p.lc++
 
 		case CHAR:
 			var c byte
@@ -209,8 +211,7 @@ loop:
 				}
 				c = byte(rawC[0])
 			}
-			p.mem[p.lc] = int(c)
-			p.lc++
+			p.addInstruction(int(c))
 
 		case STRING:
 			rawStr := p.lex.This.Bytes[1 : len(p.lex.This.Bytes)-1] // Raw string doesn't contain quotes
@@ -236,12 +237,10 @@ loop:
 						// panic("Unknown escaped char in string")
 					}
 				}
-				p.mem[p.lc] = int(c)
-				p.lc++
+				p.addInstruction(int(c))
 			}
 
-			p.mem[p.lc] = 0 // Add null terminator
-			p.lc++
+			p.addInstruction(0)
 
 		case EOF:
 			break loop
@@ -269,6 +268,25 @@ loop:
 	if p.HasErrors() {
 		p.PrintErrors()
 	}
+}
+
+func (p *Parser) addInstruction(inst int) {
+	p.mem[p.lc] = inst // Store instruction at memory location
+
+	// Save current line being parsed
+	var line []byte
+	println(string(p.lex.Next.Bytes))
+	if p.lex.Next.Type == COMMENT {
+		line = p.lex.line
+	} else {
+		line = p.lex.prevLine
+	}
+	if line[len(line)-1] == '\n' { // Ends in newline
+		p.listing[p.lc] = line[:len(line)-1]
+	} else { // Does not end in newline
+		p.listing[p.lc] = line
+	}
+	p.lc++ // Increment location counter
 }
 
 func (p *Parser) parseNumber() int {

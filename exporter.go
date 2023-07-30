@@ -102,33 +102,25 @@ func (m Memory) exportURL() {
 	fmt.Println(link)
 }
 
-// func (m Memory) exportHexfile(w io.Writer) {
-// 	keys := make([]int, 0, len(m))
-// 	for k := range m {
-// 		keys = append(keys, k)
-// 	}
-// 	sort.Ints(keys)
-
-// }
-
-func (m Memory) print() {
+func (m Memory) exportListing(w io.Writer, lst map[int][]byte) {
 	keys := make([]int, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
 
-	fmt.Println("\n       Address       |     Instruction     ")
-	fmt.Println("---------------------|---------------------")
+	fmt.Fprintln(w, "Abs.\t Octal")
+	fmt.Fprintln(w, "Addr.\tContents\tTag\tInstruction\tComment")
+	fmt.Fprintln(w, "-----\t--------\t---\t-----------\t--------")
 	lastAddr := keys[0]
 	for _, addr := range keys {
 		if addr-lastAddr > 1 {
-			fmt.Printf("%21s:%21s\n", "", "")
+			fmt.Fprintf(w, "    :\n")
 		}
 		inst := m[addr]
-		fmt.Printf("%.12b    %.4o | %.4o    %.12b\n", addr, addr, inst, inst)
+		line := lst[addr]
+		fmt.Fprintf(w, "%.4o,\t  %.4o\t\t%s\n", addr, inst, line)
 		lastAddr = addr
 	}
-	// fmt.Println("-------------------------------------------")
-	fmt.Println()
+	fmt.Fprintln(w, "$")
 }

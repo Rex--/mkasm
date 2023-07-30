@@ -8,7 +8,7 @@
 TSF=6041
 
 *10                   / Set current assembly origin to address 10,
-STPTR,    STRNG-1     / An auto-increment register (one of eight at 10-17)
+STPTR,  STRNG-1       / An auto-increment register (one of eight at 10-17)
 
 *200                  / Set current assembly origin to program text area
 HELLO,  CLA CLL       / Clear AC and Link again (needed when we loop back from tls)
