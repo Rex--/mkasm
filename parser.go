@@ -275,7 +275,6 @@ func (p *Parser) addInstruction(inst int) {
 
 	// Save current line being parsed
 	var line []byte
-	println(string(p.lex.Next.Bytes))
 	if p.lex.Next.Type == COMMENT {
 		line = p.lex.line
 	} else {
