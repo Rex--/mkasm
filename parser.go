@@ -62,7 +62,7 @@ func (p *Parser) parseP8Assembly() {
 loop:
 	for {
 		p.lex.Advance()
-		// fmt.Printf("%d, %d\t[%d]\t%s\n", l.This.Line, l.This.Col, l.This.Type, strings.TrimSpace(string(l.This.Bytes)))
+		// fmt.Printf("%d, %d\t[%d]\t%s\n", p.lex.This.Line, p.lex.This.Col, p.lex.This.Type, strings.TrimSpace(string(p.lex.This.Bytes)))
 
 		switch p.lex.This.Type {
 
@@ -515,7 +515,10 @@ func (p *Parser) parseSymbolDefinition() {
 	p.lex.Advance() // Equal sign '='
 	value, str := p.parseExpression()
 	if str == "" {
-		p.symtab.Set(symbol, int(value))
+		redef := p.symtab.Set(symbol, int(value))
+		if redef {
+			p.apass = true
+		}
 	} else {
 		// fmt.Printf("Another pass required: %s (%s)\n", str, symbol)
 		p.undef = append(p.undef, lex)
@@ -526,5 +529,8 @@ func (p *Parser) parseSymbolDefinition() {
 func (p *Parser) parseLabel() {
 	symbol := string(p.lex.This.Bytes)
 	p.lex.Advance() // Comma ','
-	p.symtab.Label(symbol, p.lc)
+	redef := p.symtab.Label(symbol, p.lc)
+	if redef {
+		p.apass = true
+	}
 }

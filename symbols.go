@@ -24,22 +24,28 @@ func (st *SymbolTable) Get(symbol string) *Symbol {
 	return nil
 }
 
-func (st *SymbolTable) Set(symbol string, val int) {
-	// if lastVal, exists := (*st)[symbol]; exists && val != lastVal.Val {
-	// 	// fmt.Printf("Redefined existing symbol: %s = %o\n", symbol, val)
-	// } else if !exists {
-	// 	// fmt.Printf("Defined new symbol: %s = %o\n", symbol, val)
-	// }
+func (st *SymbolTable) Set(symbol string, val int) (redef bool) {
+	if _, exists := (*st)[symbol]; exists {
+		// fmt.Printf("Redefined existing symbol: %s = %o\n", symbol, val)
+		redef = true
+	} else {
+		// fmt.Printf("Defined new symbol: %s = %o\n", symbol, val)
+		redef = false
+	}
 	(*st)[symbol] = Symbol{SI, val}
+	return
 }
 
-func (st *SymbolTable) Label(symbol string, val int) {
-	// if lastVal, exists := (*st)[symbol]; exists && val != lastVal.Val {
-	// fmt.Printf("Redefined existing label: %s = %o\n", symbol, val)
-	// } else if !exists {
-	// fmt.Printf("Defined new symbol: %s = %o\n", symbol, val)
-	// }
+func (st *SymbolTable) Label(symbol string, val int) (redef bool) {
+	if _, exists := (*st)[symbol]; exists {
+		// fmt.Printf("Redefined existing label: %s = %o\n", symbol, val)
+		redef = true
+	} else {
+		// fmt.Printf("Defined new symbol: %s = %o\n", symbol, val)
+		redef = false
+	}
 	(*st)[symbol] = Symbol{LABEL, val}
+	return
 }
 
 var default_symbols SymbolTable = SymbolTable{
