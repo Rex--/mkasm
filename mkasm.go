@@ -24,6 +24,8 @@ type CLIArgs struct {
 	Bin  bool
 	URL  bool
 
+	CustomBaseURL string
+
 	Listing bool
 	Dump    bool
 
@@ -46,14 +48,15 @@ func parseArgs() CLIArgs {
 	flag.Usage = printUsage
 
 	// Add flags
-	flag.BoolVar(&args.LangPal3, "3", true, "Only support PAL-III syntax.")
-	flag.BoolVar(&args.LangPalD, "D", false, "Support additional PAL-D syntax.")
+	// flag.BoolVar(&args.LangPal3, "3", true, "Only support PAL-III syntax")
+	flag.BoolVar(&args.LangPalD, "D", false, "Support additional PAL-D syntax")
 	flag.BoolVar(&args.Pobj, "pobj", false, "Output in PObject (.po) format")
 	flag.BoolVar(&args.Rim, "rim", false, "Output in RIM format")
-	flag.BoolVar(&args.URL, "url", false, "Output as encoded url")
-	flag.BoolVar(&args.Dump, "dump", false, "Dump assembled program to stdout")
+	flag.BoolVar(&args.URL, "url", false, "Output in URL format")
+	flag.BoolVar(&args.Dump, "dump", false, "Dump program listing to stdout")
 	flag.BoolVar(&args.Listing, "list", false, "Generate program listing file")
 	flag.IntVar(&args.ErrCtx, "err-ctx", 0, "Lines of context surrounding errors")
+	flag.StringVar(&args.CustomBaseURL, "url-base", "", "Base URL to use for URL format.")
 	help := flag.Bool("help", false, "Print this message and exit")
 
 	// Parse
@@ -102,8 +105,13 @@ func parseArgs() CLIArgs {
 		os.Exit(1)
 	}
 
+	// Determine if URL flag was provided
+	if !args.URL && args.CustomBaseURL != "" {
+		args.URL = true
+	}
+
 	// Set a default output format if we couldn't deduce one
-	if !args.Pobj && !args.Rim && !args.URL {
+	if !args.Pobj && !args.Rim && !args.URL && !args.Dump {
 		// Default currently is pobj because it's human readable
 		args.Pobj = true
 	}
@@ -135,7 +143,7 @@ func main() {
 	parser.parseP8Assembly()
 
 	if args.Dump {
-		parser.mem.exportListing(os.Stdout, parser.listing)
+		parser.mem.exportListing(os.Stdout, parser.listing, parser.tagListing)
 	}
 
 	// Open out file
@@ -175,8 +183,8 @@ func main() {
 	}
 
 	if args.URL {
-		fmt.Println("Output URL:")
-		parser.mem.exportURL()
+		// fmt.Println("Output URL:")
+		parser.mem.exportURL(args.CustomBaseURL)
 	}
 
 	// Generate listing file
@@ -187,7 +195,7 @@ func main() {
 			panic(err)
 		}
 		fmt.Println("Writing program listing:", outPath)
-		parser.mem.exportListing(outFile, parser.listing)
+		parser.mem.exportListing(outFile, parser.listing, parser.tagListing)
 		outFile.Close()
 	}
 }

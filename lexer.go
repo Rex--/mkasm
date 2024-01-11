@@ -296,7 +296,10 @@ func scanLines(data []byte, atEOF bool) (advance int, token []byte, err error) {
 
 // Reads the current line into buffer
 func (l *Lexer) readLine() {
-	l.prevLine = l.line
+	// Don't update prevLine if the current line is empty
+	if len(l.line) != 0 && l.line[0] != '\n' {
+		l.prevLine = l.line
+	}
 	if l.s.Scan() {
 		l.line = l.s.Bytes()
 		l.pos = 0

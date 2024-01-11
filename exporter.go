@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sort"
@@ -73,9 +74,9 @@ func (m Memory) exportRim(w io.Writer) {
 	}
 }
 
-var urlBase = "http://localhost:8000/grid.html"
+// var urlBase = "http://localhost"
 
-func (m Memory) exportURL() {
+func (m Memory) exportURL(urlBase string) {
 	keys := make([]int, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
@@ -102,24 +103,56 @@ func (m Memory) exportURL() {
 	fmt.Println(link)
 }
 
-func (m Memory) exportListing(w io.Writer, lst map[int][]byte) {
+func (m Memory) exportListing(w io.Writer, lst map[int][]byte, labels map[int][]byte) {
 	keys := make([]int, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Ints(keys)
 
-	fmt.Fprintln(w, "Abs.\t Octal")
-	fmt.Fprintln(w, "Addr.\tContents\tTag\tInstruction\tComment")
-	fmt.Fprintln(w, "-----\t--------\t---\t-----------\t--------")
+	fmt.Fprintln(w, "Abs\tInst")
+	fmt.Fprintln(w, "Addr\tData\tTag\t\tInstruction")
+	fmt.Fprintln(w, "-----\t----\t--------\t-----------")
 	lastAddr := keys[0]
 	for _, addr := range keys {
 		if addr-lastAddr > 1 {
 			fmt.Fprintf(w, "    :\n")
 		}
 		inst := m[addr]
-		line := lst[addr]
-		fmt.Fprintf(w, "%.4o,\t  %.4o\t\t%s\n", addr, inst, line)
+		var label []byte
+		var line []byte
+		if l, exists := labels[addr]; exists {
+			// Add trailing comma
+			label = append(bytes.TrimSpace(l), ',')
+
+			// Cut label from instruction if on the same line
+			line = bytes.TrimPrefix(lst[addr], label)
+
+			// Add extra tab for alignment (allows for labels > 8 char long)
+			if len(label) < 8 {
+				label = append(label, '\t')
+			}
+		} else {
+			line = lst[addr]
+			label = []byte("\t")
+		}
+		// Trim leading/trailing whitespace and remove newlines (in case of errors)
+		line = bytes.TrimSpace(bytes.ReplaceAll(line, []byte("\n"), []byte("")))
+
+		before, after, found := bytes.Cut(line, []byte("/"))
+		var comment []byte
+		if found {
+			line = bytes.TrimSpace(before)
+			if len(line) < 8 {
+				line = append(line, '\t', '\t')
+			} else if len(line) < 16 {
+				line = append(line, '\t')
+			}
+			comment = append([]byte("/ "), bytes.TrimSpace(after)...)
+		} else {
+			comment = []byte("")
+		}
+		fmt.Fprintf(w, "%.4o,\t%.4o\t%s\t%s\t%s\n", addr, inst, label, line, comment)
 		lastAddr = addr
 	}
 	fmt.Fprintln(w, "$")

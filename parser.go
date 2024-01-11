@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 )
@@ -21,26 +22,28 @@ import (
 // }
 
 type Parser struct {
-	lex     *Lexer
-	symtab  *SymbolTable
-	lc      int
-	mem     Memory
-	listing map[int][]byte
-	undef   []Lexeme // Undefined symbols for last pass
-	apass   bool     // Another Pass?
-	pdepth  int      // Parsed depth
-	mdepth  int      // Max depth
+	lex        *Lexer
+	symtab     *SymbolTable
+	lc         int
+	mem        Memory
+	listing    map[int][]byte
+	tagListing map[int][]byte
+	undef      []Lexeme // Undefined symbols for last pass
+	apass      bool     // Another Pass?
+	pdepth     int      // Parsed depth
+	mdepth     int      // Max depth
 }
 
 func NewParser(l *Lexer, st *SymbolTable) *Parser {
 	// Create our parser
 	return &Parser{
-		lex:     l,
-		symtab:  st,
-		lc:      0o200,
-		mem:     make(Memory),
-		listing: make(map[int][]byte),
-		mdepth:  100,
+		lex:        l,
+		symtab:     st,
+		lc:         0o200,
+		mem:        make(Memory),
+		listing:    make(map[int][]byte),
+		tagListing: make(map[int][]byte),
+		mdepth:     100,
 	}
 }
 
@@ -256,6 +259,8 @@ loop:
 		p.lc = 0
 		p.apass = false
 		p.undef = make([]Lexeme, 0)
+		p.listing = make(map[int][]byte)
+		p.tagListing = make(map[int][]byte)
 		// Reset Errors
 		p.ResetErrors()
 		goto loop
@@ -280,11 +285,11 @@ func (p *Parser) addInstruction(inst int) {
 	} else {
 		line = p.lex.prevLine
 	}
-	if line[len(line)-1] == '\n' { // Ends in newline
-		p.listing[p.lc] = line[:len(line)-1]
-	} else { // Does not end in newline
-		p.listing[p.lc] = line
-	}
+
+	line = bytes.TrimSpace(line)
+	p.listing[p.lc] = bytes.Clone(line)
+
+	// println("inst:", strconv.FormatInt(int64(inst), 8), " pc:", strconv.FormatInt(int64(p.lc), 8), " line:", string(p.lex.line), "prevLine:", string(p.lex.prevLine))
 	p.lc++ // Increment location counter
 }
 
@@ -528,9 +533,11 @@ func (p *Parser) parseSymbolDefinition() {
 
 func (p *Parser) parseLabel() {
 	symbol := string(p.lex.This.Bytes)
+	p.tagListing[p.lc] = bytes.Clone(p.lex.This.Bytes)
 	p.lex.Advance() // Comma ','
 	redef := p.symtab.Label(symbol, p.lc)
 	if redef {
 		p.apass = true
 	}
+	// println("label: ", symbol, " pc:", strconv.FormatInt(int64(p.lc), 8))
 }
