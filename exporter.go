@@ -100,7 +100,7 @@ func (m Memory) exportURL(urlBase string) {
 		// Update last address
 		lastAddr = addr
 	}
-	fmt.Println(link)
+	fmt.Print(link)
 }
 
 func (m Memory) exportListing(w io.Writer, lst map[int][]byte, labels map[int][]byte) {
@@ -152,8 +152,48 @@ func (m Memory) exportListing(w io.Writer, lst map[int][]byte, labels map[int][]
 		} else {
 			comment = []byte("")
 		}
+
+		// Check for string in line
+		if bytes.ContainsAny(line, "\"") {
+			// Only print the full string on the first line with the label
+			if len(label) == 1 && label[0] == '\t' {
+				line = []byte("\t\t")
+
+				// Add comment with ascii character of memory location
+				if len(comment) == 0 {
+					char := byte(m[addr])
+					if char == 0 {
+						comment = []byte("/ NULL")
+					} else if char == '\n' {
+						comment = []byte("/ \"\\n\"")
+					} else {
+						comment = []byte{'/', ' ', '"', byte(m[addr]), '"'}
+					}
+				}
+			} else {
+				// Add comment of character if line is short enough
+				if len(line) < 24 {
+					char := byte(m[addr])
+					if char == 0 {
+						comment = []byte("/ NULL")
+					} else if char == '\n' {
+						comment = []byte("/ \"\\n\"")
+					} else {
+						comment = []byte{'/', ' ', '"', byte(m[addr]), '"'}
+					}
+				}
+
+			}
+		}
 		fmt.Fprintf(w, "%.4o,\t%.4o\t%s\t%s\t%s\n", addr, inst, label, line, comment)
 		lastAddr = addr
 	}
 	fmt.Fprintln(w, "$")
+}
+
+func (m Memory) exportSize() {
+	wordsTotal := 0o7777
+	wordsUsed := len(m)
+	wordsFree := wordsTotal - wordsUsed
+	fmt.Printf("used: %d  free: %d  total: %d (words)\n", wordsUsed, wordsFree, wordsTotal)
 }
