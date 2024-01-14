@@ -28,6 +28,7 @@ type CLIArgs struct {
 
 	Listing bool
 	Dump    bool
+	Size    bool
 
 	ErrCtx int
 }
@@ -55,6 +56,7 @@ func parseArgs() CLIArgs {
 	flag.BoolVar(&args.URL, "url", false, "Output in URL format")
 	flag.BoolVar(&args.Dump, "dump", false, "Dump program listing to stdout")
 	flag.BoolVar(&args.Listing, "list", false, "Generate program listing file")
+	flag.BoolVar(&args.Size, "size", false, "Print program size information")
 	flag.IntVar(&args.ErrCtx, "err-ctx", 0, "Lines of context surrounding errors")
 	flag.StringVar(&args.CustomBaseURL, "url-base", "", "Base URL to use for URL format.")
 	help := flag.Bool("help", false, "Print this message and exit")
@@ -197,5 +199,10 @@ func main() {
 		fmt.Println("Writing program listing:", outPath)
 		parser.mem.exportListing(outFile, parser.listing, parser.tagListing)
 		outFile.Close()
+	}
+
+	// Print program size
+	if args.Size {
+		parser.mem.exportSize()
 	}
 }
