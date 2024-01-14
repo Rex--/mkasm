@@ -153,7 +153,7 @@ func (l *Lexer) Advance() {
 	// Check for comment and read the rest of the line as a comment lexeme
 	if l.line[l.pos] == '/' {
 		l.Next.Type = COMMENT
-		l.Next.Bytes = l.line[l.pos : len(l.line)-1]
+		l.Next.Bytes = bytes.Clone(l.line[l.pos : len(l.line)-1])
 		l.pos = len(l.line) - 1
 		return // Bail early
 	}
@@ -176,9 +176,9 @@ func (l *Lexer) Advance() {
 
 			if l.pos < len(l.line) && l.line[l.pos] == '"' { // Include trailing "
 				l.pos++
-				l.Next.Bytes = l.line[start:l.pos]
+				l.Next.Bytes = bytes.Clone(l.line[start:l.pos])
 			} else {
-				l.Next.Bytes = l.line[start:l.pos]
+				l.Next.Bytes = bytes.Clone(l.line[start:l.pos])
 				l.UnknownLexeme(&l.Next, -1, "unterminated string")
 				// panic("unterminated string")
 			}
@@ -206,10 +206,10 @@ func (l *Lexer) Advance() {
 
 			// Check for ending ' (not required)
 			if l.line[l.pos] == '\'' {
-				l.Next.Bytes = l.line[start : l.pos+1]
+				l.Next.Bytes = bytes.Clone(l.line[start : l.pos+1])
 				l.pos++
 			} else if isWhitespace(l.line[l.pos]) || l.line[l.pos] == '\n' || l.line[l.pos] == ';' {
-				l.Next.Bytes = l.line[start:l.pos]
+				l.Next.Bytes = bytes.Clone(l.line[start:l.pos])
 			} else {
 				l.UnknownLexeme(&l.Next, l.pos, "unknown character")
 			}
@@ -221,7 +221,7 @@ func (l *Lexer) Advance() {
 	// Check for valid punctuation lexemes
 	if p := l.line[l.pos]; p == '=' || p == '*' || p == ',' || p == '.' || p == '-' || p == '+' {
 		l.Next.Type = PUNCTUATION
-		l.Next.Bytes = l.line[l.pos : l.pos+1]
+		l.Next.Bytes = bytes.Clone(l.line[l.pos : l.pos+1])
 		l.pos++
 		return // Bail early
 	}
@@ -241,7 +241,7 @@ func (l *Lexer) Advance() {
 			}
 		}
 		l.Next.Type = SYMBOL
-		l.Next.Bytes = l.line[start:l.pos]
+		l.Next.Bytes = bytes.Clone(l.line[start:l.pos])
 
 	} else if isDigit(l.line[l.pos]) {
 		// fmt.Println("Found number:", string(l.line[l.pos:]))
@@ -266,7 +266,7 @@ func (l *Lexer) Advance() {
 			c = l.line[l.pos]
 		}
 		l.Next.Type = NUMBER
-		l.Next.Bytes = l.line[start:l.pos]
+		l.Next.Bytes = bytes.Clone(l.line[start:l.pos])
 
 	} else {
 		// Invalid character
