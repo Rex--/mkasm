@@ -192,8 +192,26 @@ func (m Memory) exportListing(w io.Writer, lst map[int][]byte, labels map[int][]
 }
 
 func (m Memory) exportSize() {
-	wordsTotal := 0o7777
+	wordsTotal := 0o10000
 	wordsUsed := len(m)
-	wordsFree := wordsTotal - wordsUsed
-	fmt.Printf("used: %d  free: %d  total: %d (words)\n", wordsUsed, wordsFree, wordsTotal)
+	wordsPercent := (float32(wordsUsed) / float32(wordsTotal)) * 100
+
+	zeroTotal := 0o200
+	zeroUsed := 0
+	autoTotal := 0o10
+	autoUsed := 0
+	for addr := range m {
+		if addr <= 0o17 && addr >= 0o10 {
+			autoUsed++
+		}
+		if addr < 0o200 {
+			zeroUsed++
+		}
+	}
+	zeroPercent := (float32(zeroUsed) / float32(zeroTotal)) * 100
+	autoPercent := (float32(autoUsed) / float32(autoTotal)) * 100
+	fmt.Printf("Memory Usage Summary:\n")
+	fmt.Printf("    Auto Locations    used %5o₈ (%4d) of %5o₈ (%4d) words  (%5.1f%%)\n", autoUsed, autoUsed, autoTotal, autoTotal, autoPercent)
+	fmt.Printf("    Zero Page         used %5o₈ (%4d) of %5o₈ (%4d) words  (%5.1f%%)\n", zeroUsed, zeroUsed, zeroTotal, zeroTotal, zeroPercent)
+	fmt.Printf("    Total Memory      used %5o₈ (%4d) of %5o₈ (%4d) words  (%5.1f%%)\n", wordsUsed, wordsUsed, wordsTotal, wordsTotal, wordsPercent)
 }
