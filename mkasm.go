@@ -148,6 +148,10 @@ func main() {
 		parser.symtab = &mk_symbols
 	}
 	parser.parseP8Assembly()
+	if parser.HasErrors() {
+		srcFile.Close()
+		os.Exit(1)
+	}
 
 	if args.Dump {
 		parser.mem.exportListing(os.Stdout, parser.listing, parser.tagListing)
