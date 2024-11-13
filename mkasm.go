@@ -17,6 +17,7 @@ type CLIArgs struct {
 	LangVer  byte
 	LangPal3 bool
 	LangPalD bool
+	LangMK   bool
 
 	Pobj bool
 	Ihex bool
@@ -57,6 +58,7 @@ func parseArgs() CLIArgs {
 	flag.BoolVar(&args.Dump, "dump", false, "Dump program listing to stdout")
 	flag.BoolVar(&args.Listing, "list", false, "Generate program listing file")
 	flag.BoolVar(&args.Size, "size", false, "Print program size information")
+	flag.BoolVar(&args.LangMK, "mk", false, "Use alternate MK symbol table")
 	flag.IntVar(&args.ErrCtx, "err-ctx", 0, "Lines of context surrounding errors")
 	flag.StringVar(&args.CustomBaseURL, "url-base", "", "Base URL to use for URL format.")
 	help := flag.Bool("help", false, "Print this message and exit")
@@ -142,6 +144,9 @@ func main() {
 
 	lexer := NewLexer(srcFile, &args)
 	parser := NewParser(lexer, &default_symbols)
+	if args.LangMK {
+		parser.symtab = &mk_symbols
+	}
 	parser.parseP8Assembly()
 
 	if args.Dump {
