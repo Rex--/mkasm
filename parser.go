@@ -100,27 +100,13 @@ loop:
 			}
 
 		case SYMBOL:
-			if p.lex.Next.Type == PUNCTUATION && p.lex.Next.Bytes[0] != '.' { // Symbol definition
-				switch p.lex.Next.Bytes[0] {
-				case '=':
-					p.parseSymbolDefinition()
-				case ',':
-					p.parseLabel()
+			switch p.lex.Next.Bytes[0] {
+			case '=':
+				p.parseSymbolDefinition()
+			case ',':
+				p.parseLabel()
 
-				case '-':
-					fallthrough
-				case '+':
-					inst, expr := p.parseExpression()
-					if expr != "" {
-						// fmt.Println("Another pass required:", expr)
-						p.apass = true
-					} else {
-						p.addInstruction(inst)
-					}
-					// p.lc++
-				}
-
-			} else { // Were using the symbol
+			default:
 				// Lookup symbol
 				sym := p.symtab.Get(string(p.lex.This.Bytes))
 				if sym != nil && sym.Type == MRI {
@@ -182,8 +168,12 @@ loop:
 						p.addInstruction(inst)
 					}
 				}
-				// p.lc++
 			}
+			// if p.lex.Next.Type == PUNCTUATION && p.lex.Next.Bytes[0] != '.' { // Symbol definition
+
+			// } else { // Were using the symbol
+			// 	// p.lc++
+			// }
 
 		case NUMBER:
 			inst, expr := p.parseExpression()
@@ -261,6 +251,7 @@ loop:
 		p.undef = make([]Lexeme, 0)
 		p.listing = make(map[int][]byte)
 		p.tagListing = make(map[int][]byte)
+		p.mem = make(Memory)
 		// Reset Errors
 		p.ResetErrors()
 		goto loop
@@ -315,7 +306,7 @@ func (p *Parser) parseNumber() int {
 	}
 
 	if err != nil {
-		panic("Number error (Too large?)")
+		panic(err.Error())
 	}
 	// fmt.Println("Parsed number:", string(p.lex.This.Bytes), "->", strconv.Itoa(int(i64)))
 	// fmt.Printf("NUM: %o\t%s ->\t\t%o\n", p.lc, string(p.lex.This.Bytes), int(i64))
@@ -327,7 +318,7 @@ func (p *Parser) parseExpression() (int, string) {
 	var start string = string(p.lex.This.Bytes)
 	var sign, operand string
 
-	if p.lex.This.Type == PUNCTUATION { // (<+|->A) OR (. [<+|-> B]) formatted expression
+	if p.lex.This.Type == PUNCTUATION { // (<+|->A) OR (. [<+|-> B]) formatted expression OR (A) constant expression
 
 		if p.lex.This.Bytes[0] == '.' { // (. [<+|-> B]) formatted expression
 			if p.lex.Next.Type == PUNCTUATION {
@@ -371,27 +362,29 @@ func (p *Parser) parseExpression() (int, string) {
 				return p.lc, ""
 			}
 
-		} else { // <+|->A formatted expression
+		} else { // <+|->A formatted expression or (A[)] constant
 			start = ""
 			sign = string(p.lex.This.Bytes)
 			signL := p.lex.This
 			p.lex.Advance()
 			var a int
-			operand = string(p.lex.This.Bytes)
-			if isLetter(p.lex.This.Bytes[0]) { // Lookup symbol
-				sym := p.symtab.Get(operand)
-				if sym != nil {
-					a = sym.Val
-				} else {
-					p.undef = append(p.undef, p.lex.This)
-					return -1, operand
-				}
-			} else if isDigit(p.lex.This.Bytes[0]) { // Parse number
-				a = p.parseNumber()
-			} else {
-				p.SyntaxError(&p.lex.This, "unknown operand in expression")
-				// panic("unknown expression operand")
-			}
+			// operand = string(p.lex.This.Bytes)
+			// operandL := p.lex.This
+			a, operand := p.parseExpression()
+			// if isLetter(p.lex.This.Bytes[0]) { // Lookup symbol
+			// 	sym := p.symtab.Get(operand)
+			// 	if sym != nil {
+			// 		a = sym.Val
+			// 	} else {
+			// 		p.undef = append(p.undef, p.lex.This)
+			// 		return -1, operand
+			// 	}
+			// } else if isDigit(p.lex.This.Bytes[0]) { // Parse number
+			// 	a = p.parseNumber()
+			// } else {
+			// 	p.SyntaxError(&p.lex.This, "unknown operand in expression")
+			// 	// panic("unknown expression operand")
+			// }
 
 			var ans int
 			switch sign {
@@ -399,6 +392,17 @@ func (p *Parser) parseExpression() (int, string) {
 				ans = a * -1
 			case "+":
 				ans = a
+			case "(":
+				ans = p.parseConstant(a)
+				if ans == -1 {
+					p.IllegalReferenceError(&signL, "no location for constant")
+					return -1, operand
+				}
+				p.lex.Advance()
+				if p.lex.This.Bytes[0] == ')' {
+					p.lex.Advance()
+				}
+				// println("Found constant: " + operand)
 			default:
 				p.SyntaxError(&signL, "unknown operator in expression")
 				// panic("unknown operation")
@@ -511,6 +515,21 @@ func (p *Parser) parseExpression() (int, string) {
 
 	return -1, "error"
 	// fmt.Printf("%s%s%s\n", start, sign, operand)
+}
+
+// Search for the first unused memory location, decending from the top of the current page
+func (p *Parser) parseConstant(value int) int {
+	page := p.lc & 0b111110000000
+	addr := page | 0b1111111
+	for _, ok := p.mem[addr]; ok; {
+		addr--
+		if addr == page {
+			return -1
+		}
+		_, ok = p.mem[addr]
+	}
+	p.mem[addr] = value
+	return addr
 }
 
 func (p *Parser) parseSymbolDefinition() {

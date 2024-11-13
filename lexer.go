@@ -219,7 +219,7 @@ func (l *Lexer) Advance() {
 	}
 
 	// Check for valid punctuation lexemes
-	if p := l.line[l.pos]; p == '=' || p == '*' || p == ',' || p == '.' || p == '-' || p == '+' {
+	if p := l.line[l.pos]; p == '=' || p == '*' || p == ',' || p == '.' || p == '-' || p == '+' || p == '(' || p == ')' {
 		l.Next.Type = PUNCTUATION
 		l.Next.Bytes = bytes.Clone(l.line[l.pos : l.pos+1])
 		l.pos++
